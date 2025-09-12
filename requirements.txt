@@ -40,3 +40,6 @@ urllib3==2.2.1
 whitenoise==6.6.0
 zipp==3.17.0
 setuptools>=70
+PyMySQL==1.1.1
+dj-database-url
+
