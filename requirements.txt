@@ -42,4 +42,7 @@ zipp==3.17.0
 setuptools>=70
 PyMySQL==1.1.1
 dj-database-url
+wheel>=0.43
+
+
 
