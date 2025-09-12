@@ -233,7 +233,13 @@ EMAIL_USE_TLS = True
 #     STATIC_ROOT = '/home/jaswbwsw/public_html/toprofile_static'
 # else:
 MEDIA_URL="/media/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# STATIC_ROOT = BASE_DIR / "staticfiles"
+
+STATIC_ROOT = BASE_DIR / "staticfiles_build" / "static"
+
+
+
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 CORS_EXPOSE_HEADERS = [
