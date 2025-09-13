@@ -5,7 +5,7 @@ from .constant import STATUS
 from datetime import datetime
 from django.utils.text import slugify
 
-SPECIAL_CHARS_REGEX = "[^a-zA-Z0-9 \n\.]"
+SPECIAL_CHARS_REGEX = r"[^a-zA-Z0-9 \n\.]"
 
 class Blog(models.Model):
     def upload_to(instance, filename):

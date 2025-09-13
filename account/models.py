@@ -10,7 +10,7 @@ from django.utils import timezone
 from django.apps import apps
 from django.conf import settings
 
-SPECIAL_CHARS_REGEX = "[^a-zA-Z0-9 \n\.]"
+SPECIAL_CHARS_REGEX = r"[^a-zA-Z0-9 \n\.]"
 
 class CustomUserManager(BaseUserManager):
     use_in_migrations = True
