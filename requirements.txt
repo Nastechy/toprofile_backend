@@ -43,6 +43,7 @@ setuptools<81
 PyMySQL==1.1.1
 dj-database-url
 wheel>=0.43
+cryptography>=42.0.0
 
 
 
