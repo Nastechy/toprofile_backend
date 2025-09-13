@@ -34,7 +34,7 @@ SECRET_KEY = config("NEW_SECRET")
 DEBUG = True if config("DEBUG") == "True" else False
 
 
-ALLOWED_HOSTS = ["127.0.0.1","toprofile-backend.onrender.com", "https://toprofile-backend.vercel.app"]
+ALLOWED_HOSTS = ["127.0.0.1","toprofile-backend.onrender.com", "toprofile-backend.vercel.app"]
 
 
 # Application definition
