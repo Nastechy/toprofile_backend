@@ -1,12 +1,11 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Build the project
-echo "Building the project..."
-python3 -m pip install -r requirements.txt
+echo "==> Installing dependencies..."
+python -m pip install --upgrade pip wheel
+python -m pip install -r requirements.txt
 
-echo "Make Migration..."
-python3 manage.py makemigrations --noinput
-python3 manage.py migrate --noinput
+echo "==> Collecting static files..."
+python manage.py collectstatic --noinput --clear
 
-echo "Collect Static..."
-python3 manage.py collectstatic --noinput --clear
+echo "Build step completed."
