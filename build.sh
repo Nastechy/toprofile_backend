@@ -7,7 +7,7 @@ if [ -z "$PYTHON" ]; then
   PYTHON="$(command -v python || true)"
 fi
 if [ -z "$PYTHON" ]; then
-  # Vercel’s Python path when python3.12 is provisioned
+  # Vercel’s Python path when python3.12 is provisioned /
   if [ -x /python312/bin/python3 ]; then
     PYTHON=/python312/bin/python3
   else
