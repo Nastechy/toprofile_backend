@@ -1,23 +1,12 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "build.sh",
-      "use": "@vercel/static-build"
-    }
-  ],
+  "functions": {
+    "api/index.py": { "runtime": "python3.12", "maxDuration": 30 }
+  },
   "routes": [
-    {
-      "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "/media/(.*)",
-      "dest": "/media/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ]
+    { "src": "^/static/(.*)$", "dest": "/static/$1" },
+    { "src": "^(?!/static/).*", "dest": "api/index.py" }
+  ],
+  "buildCommand": "bash build.sh",
+  "outputDirectory": "staticfiles_build"
 }
