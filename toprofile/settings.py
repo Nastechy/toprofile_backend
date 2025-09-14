@@ -16,9 +16,30 @@ from decouple import config
 from datetime import timedelta
 import os
 import dj_database_url
+import cloudinary
 
 import pymysql
 pymysql.install_as_MySQLdb()
+
+
+
+cloudinary.config(
+    cloud_name=config("CLOUDINARY_CLOUD_NAME"),
+    api_key=config("CLOUDINARY_API_KEY"),
+    api_secret=config("CLOUDINARY_API_SECRET"),
+    secure=True,
+)
+
+import logging
+logging.getLogger(__name__).info(
+    "Cloudinary loaded: cloud_name=%s, api_key_present=%s",
+    cloudinary.config().cloud_name, bool(cloudinary.config().api_key)
+)
+
+# Make all ImageField/FileField uploads go to Cloudinary:
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,7 +118,7 @@ WSGI_APPLICATION = 'toprofile.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/4.0/ref/settings/#databases
-if DEBUG:
+if DEBUG == False:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -176,7 +197,7 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
 
     "ALGORITHM": "HS256",
-    "SIGNING_KEY": settings.SECRET_KEY,
+    "SIGNING_KEY": SECRET_KEY,
     "VERIFYING_KEY": "",
     "AUDIENCE": None,
     "ISSUER": None,

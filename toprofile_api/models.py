@@ -55,16 +55,29 @@ class PropertyListing(models.Model):
             self.slug = slugify(f'{self.title}-{timestamp_str}')
         super(PropertyListing, self).save(*args, **kwargs)
 
+# class ImageAsset(models.Model):
+#     def upload_to(instance, filename):
+#         url = re.sub(
+#             SPECIAL_CHARS_REGEX,
+#             "_",
+#             "images/profile/{filename}".format(filename=filename),
+#         )
+#         return url
+#     image=models.ImageField(upload_to=upload_to)
+#     property=models.ForeignKey(PropertyListing,on_delete=models.CASCADE,null=True,blank=True,related_name="propertyImages")
+
 class ImageAsset(models.Model):
-    def upload_to(instance, filename):
-        url = re.sub(
-            SPECIAL_CHARS_REGEX,
-            "_",
-            "images/profile/{filename}".format(filename=filename),
-        )
-        return url
-    image=models.ImageField(upload_to=upload_to)
-    property=models.ForeignKey(PropertyListing,on_delete=models.CASCADE,null=True,blank=True,related_name="propertyImages")
+    property = models.ForeignKey(
+        PropertyListing,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="propertyImages",
+    )
+    url = models.URLField()
+    public_id = models.CharField(max_length=255)
+    width = models.IntegerField(null=True, blank=True)
+    height = models.IntegerField(null=True, blank=True)
+    format = models.CharField(max_length=32, blank=True)
 
 class HeroSection(models.Model):
     def upload_to(instance, filename):

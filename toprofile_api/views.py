@@ -33,6 +33,10 @@ from rest_framework import status
 from .helpers import get_analytics
 from django.db.models import Sum
 from django.db import transaction
+import logging
+logger = logging.getLogger(__name__)
+from .services.cloudinary_service import upload_property_image, delete_image, CloudinaryUploadError
+
 class BlogApiView(APIView):
     parser_classes=[JSONParser,MultiPartParser,FormParser]
    
@@ -154,23 +158,80 @@ class PropertyApiView(APIView):
         except Exception as e:
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
     @swagger_auto_schema(
-            request_body=PropertyInputSerializer
-    )
-    def post(self,request):
+            request_body=PropertyInputSerializer,
+            consumes=["multipart/form-data"],
+    )        
+    def post(self, request):
+        uploaded_public_ids = []
         try:
-            with transaction.atomic():
-                serializer=PropertyInputSerializer(data=request.data)
-                serializer.is_valid(raise_exception=True)
-                images=serializer.validated_data.pop("propertyImages",None)
-                data=serializer.save()
-                #save image 
-                if images:
-                    for image in images:
-                        ImageAsset.objects.create(property=data,image=image["image"])
-                return SuccessResponse(PropertyOutputSerializer(data).data,status=status.HTTP_200_OK)
-        except Exception as e:
-            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+            logger.debug(
+                "POST /property keys=%s files=%s",
+                list(request.data.keys()),
+                list(request.FILES.keys()),
+            )
 
+            with transaction.atomic():
+                serializer = PropertyInputSerializer(data=request.data)
+                serializer.is_valid(raise_exception=True)
+                logger.debug("Serializer valid")
+
+                # List[InMemoryUploadedFile] because PropertyInputSerializer uses ListField(ImageField)
+                images = serializer.validated_data.pop("propertyImages")
+                logger.debug("Validated image count=%d", len(images))
+
+                # Create the property first (without images)
+                property_obj = serializer.save()
+                logger.debug("Property created id=%s slug=%s", property_obj.id, property_obj.slug)
+
+                # Upload each file to Cloudinary and persist metadata
+                for idx, file_obj in enumerate(images):
+                    logger.debug(
+                        "Uploading image idx=%s name=%s size=%s",
+                        idx,
+                        getattr(file_obj, "name", None),
+                        getattr(file_obj, "size", None),
+                    )
+
+                    upload = upload_property_image(file_obj, folder=f"properties/{property_obj.id}")
+                    uploaded_public_ids.append(upload["public_id"])
+                    logger.debug(
+                        "Uploaded idx=%s public_id=%s url=%s", idx, upload["public_id"], upload["url"]
+                    )
+
+                    ImageAsset.objects.create(
+                        property=property_obj,
+                        url=upload["url"],
+                        public_id=upload["public_id"],
+                        width=upload.get("width"),
+                        height=upload.get("height"),
+                        format=upload.get("format"),
+                    )
+                    logger.debug("ImageAsset %s created", idx)
+
+                # Serialize full response (images included)
+                data = PropertyOutputSerializer(property_obj).data
+                return SuccessResponse(data, status=status.HTTP_201_CREATED)
+
+        except CloudinaryUploadError as e:
+            # If any upload fails, delete any earlier ones we uploaded
+            logger.exception("CloudinaryUploadError during property create")
+            for pid in uploaded_public_ids:
+                try:
+                    delete_image(pid)
+                except Exception:
+                    logger.exception("Rollback delete_image failed for %s", pid)
+            return FailureResponse({"detail": f"Cloudinary upload failed: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            logger.exception("Error in PropertyApiView.post (uploaded_public_ids=%s)", uploaded_public_ids)
+            # Best-effort cleanup for any uploaded images
+            for pid in uploaded_public_ids:
+                try:
+                    delete_image(pid)
+                except Exception:
+                    logger.exception("Rollback delete_image failed for %s", pid)
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
+            
 class PropertyCategoryApiView(APIView):
     @swagger_auto_schema(
             request_body=PropertyCategorySerializer

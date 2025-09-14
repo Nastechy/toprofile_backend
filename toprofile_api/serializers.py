@@ -49,21 +49,30 @@ class ImageAssetSerializer(serializers.ModelSerializer):
            
         }
 
+class ImageAssetReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImageAsset
+        fields = ["url", "public_id", "width", "height", "format"]
+
 class PropertyInputSerializer(serializers.ModelSerializer):
-    propertyImages=ImageAssetSerializer(many=True,required=False)
+    # accept multiple files under the SAME key "propertyImages"
+    propertyImages = serializers.ListField(
+        child=serializers.ImageField(),  # each item is a file
+        allow_empty=False,               # require at least one
+        write_only=True,
+        required=True,
+    )
+
     class Meta:
-        model=PropertyListing
-        exclude=[
-            "slug"
-        ]
-        
-        
+        model = PropertyListing
+        exclude = ["slug"]
+
 class PropertyOutputSerializer(serializers.ModelSerializer):
-    propertyImages=ImageAssetSerializer(many=True)
+    propertyImages = ImageAssetReadSerializer(many=True, read_only=True)
+
     class Meta:
-        model=PropertyListing
-        fields="__all__"
-        depth=1
+        model = PropertyListing
+        fields = "__all__"
         
 
 class HeroSectionSerializer(serializers.ModelSerializer):
