@@ -12,7 +12,7 @@ https://docs.djangoproject.com/en/4.0/ref/settings/
 
 from pathlib import Path
 from django.conf import settings
-from decouple import config
+from decouple import config, Csv
 from datetime import timedelta
 import os
 import dj_database_url
@@ -52,10 +52,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config("NEW_SECRET")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True if config("DEBUG") == "True" else False
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 
-ALLOWED_HOSTS = ["127.0.0.1","toprofile-backend.onrender.com", "toprofile-backend.vercel.app"]
+ALLOWED_HOSTS = config(
+    "ALLOWED_HOSTS",
+    default="127.0.0.1,localhost,toprofile-backend.onrender.com,toprofile-backend.vercel.app",
+    cast=Csv(),
+)
 
 
 # Application definition
@@ -257,6 +261,7 @@ EMAIL_USE_TLS = True
 #     STATIC_ROOT = '/home/jaswbwsw/public_html/toprofile_static'
 # else:
 MEDIA_URL="/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # STATIC_ROOT = BASE_DIR / "staticfiles"
 
