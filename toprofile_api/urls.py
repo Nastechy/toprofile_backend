@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from django.urls import path,re_path
 from .views import (
     SingleAboutAPiView,
@@ -34,7 +35,22 @@ SingleTermsofserviceAPiView,
     PropertyCategoryApiView,
     SinglePropertyCategoryApiView
 )
+def api_root(_request):
+    return JsonResponse(
+        {
+            "message": "Toprofile API is running",
+            "routes": {
+                "home": "/api/v1/home/",
+                "auth_login": "/api/v1/auth/login/",
+                "swagger": "/api/swagger/",
+                "admin": "/api/admin/",
+            },
+        }
+    )
+
+
 urlpatterns = [
+    path("", api_root),
     path("vistor/analytics/",AnalyticsAPiView.as_view()),
     path("content_section/",HomeSectionApiView.as_view()),
     path("home/",HomeApiView.as_view()),
@@ -58,7 +74,7 @@ urlpatterns = [
     path("our_team/<int:pk>/",SingleOurTeamAPiView.as_view()),
     path("testimony/",TestimonyApiView.as_view()),
     path("testimony/<int:pk>/",SingleTestimonyApiView.as_view()),
-    path("fill/form/",FillFormAPiView.as_view),
+    path("fill/form/",FillFormAPiView.as_view()),
     path("agent/",AgentApiView.as_view()),
     path("agent/<int:pk>/",SingleAgentAPiView.as_view()),
     path("agent_member/",AgentMemberApiView.as_view()),
