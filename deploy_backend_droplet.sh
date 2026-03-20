@@ -11,13 +11,53 @@ trap cleanup EXIT
 
 if [[ "${EUID}" -eq 0 ]]; then
   SUDO=""
+  AS_POSTGRES=(runuser -u postgres --)
 else
   SUDO="sudo"
+  AS_POSTGRES=(sudo -u postgres)
 fi
 
 log() { printf "\n[INFO] %s\n" "$1"; }
 warn() { printf "\n[WARN] %s\n" "$1"; }
 err() { printf "\n[ERROR] %s\n" "$1" >&2; }
+
+backup_file_if_exists() {
+  local target="$1"
+  if $SUDO test -f "$target"; then
+    local ts
+    ts="$(date +%Y%m%d%H%M%S)"
+    local bak="${target}.bak.${ts}"
+    $SUDO cp "$target" "$bak"
+    log "Backed up $target to $bak"
+  fi
+}
+
+fail_fast_on_nginx_conflicts() {
+  local server_ip="$1"
+  local count
+  count="$($SUDO sh -c "grep -Rsl 'server_name[[:space:]]\\+${server_ip//./\\.}\\([[:space:];]\\|$\\)' /etc/nginx/sites-enabled 2>/dev/null | wc -l")"
+  if [[ "$count" -gt 1 ]]; then
+    err "Fail-fast: multiple enabled nginx sites reference ${server_ip}. Keep exactly one."
+    $SUDO grep -Rsl "server_name[[:space:]]\\+${server_ip//./\\.}\\([[:space:];]\\|$\\)" /etc/nginx/sites-enabled || true
+    exit 1
+  fi
+}
+
+fail_fast_on_missing_includes() {
+  local site_file="$1"
+  local includes=()
+  local inc
+  while IFS= read -r inc; do
+    [[ -n "$inc" ]] && includes+=("$inc")
+  done < <($SUDO sed -n 's/^[[:space:]]*include[[:space:]]\+\([^;[:space:]]\+\);.*$/\1/p' "$site_file")
+
+  for inc in "${includes[@]}"; do
+    if ! $SUDO test -e "$inc"; then
+      err "Fail-fast: include target not found in ${site_file}: ${inc}"
+      exit 1
+    fi
+  done
+}
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -120,6 +160,10 @@ SERVER_IP=${SERVER_IP:-138.68.157.12}
 
 read -r -p "Expose API base path [/api/v1/]: " API_BASE_PATH
 API_BASE_PATH=${API_BASE_PATH:-/api/v1/}
+if [[ "${API_BASE_PATH}" != /* ]]; then
+  API_BASE_PATH="/${API_BASE_PATH}"
+fi
+API_BASE_PATH="${API_BASE_PATH%/}/"
 
 read -r -p "PostgreSQL DB name [toprofile_db]: " PG_DB
 PG_DB=${PG_DB:-toprofile_db}
@@ -166,17 +210,17 @@ fi
 DATABASE_URL="postgresql://${PG_USER}:${PG_PASSWORD}@${PG_HOST}:${PG_PORT}/${PG_DB}"
 
 printf "\nDefault env values this script will create (you can override in the next prompt):\n"
-printf "- DEBUG=%s\n" "$DEBUG_VALUE"
-printf "- DJANGO_SETTINGS_MODULE=%s\n" "$DJANGO_SETTINGS_MODULE"
-printf "- NEW_SECRET=***hidden***\n"
-printf "- ALLOWED_HOSTS=%s\n" "$ALLOWED_HOSTS_VALUE"
-printf "- DATABASE_URL=%s\n" "$DATABASE_URL"
-printf "- REDIS_URL=%s\n" "$REDIS_URL"
-printf "- EMAIL_HOST_USER=\n"
-printf "- EMAIL_HOST_PASSWORD=\n"
-printf "- CLOUDINARY_CLOUD_NAME=\n"
-printf "- CLOUDINARY_API_KEY=\n"
-printf "- CLOUDINARY_API_SECRET=\n"
+printf -- "- DEBUG=%s\n" "$DEBUG_VALUE"
+printf -- "- DJANGO_SETTINGS_MODULE=%s\n" "$DJANGO_SETTINGS_MODULE"
+printf -- "- NEW_SECRET=***hidden***\n"
+printf -- "- ALLOWED_HOSTS=%s\n" "$ALLOWED_HOSTS_VALUE"
+printf -- "- DATABASE_URL=%s\n" "$DATABASE_URL"
+printf -- "- REDIS_URL=%s\n" "$REDIS_URL"
+printf -- "- EMAIL_HOST_USER=\n"
+printf -- "- EMAIL_HOST_PASSWORD=\n"
+printf -- "- CLOUDINARY_CLOUD_NAME=\n"
+printf -- "- CLOUDINARY_API_KEY=\n"
+printf -- "- CLOUDINARY_API_SECRET=\n"
 
 read_multiline_env
 
@@ -196,15 +240,15 @@ PG_USER_ESCAPED="$(escape_squote "$PG_USER")"
 PG_DB_ESCAPED="$(escape_squote "$PG_DB")"
 PG_PASSWORD_ESCAPED="$(escape_squote "$PG_PASSWORD")"
 
-if ! $SUDO -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${PG_USER_ESCAPED}'" | grep -q 1; then
-  $SUDO -u postgres psql -c "CREATE USER \"${PG_USER}\" WITH PASSWORD '${PG_PASSWORD_ESCAPED}';"
+if ! "${AS_POSTGRES[@]}" psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='${PG_USER_ESCAPED}'" | grep -q 1; then
+  "${AS_POSTGRES[@]}" psql -c "CREATE USER \"${PG_USER}\" WITH PASSWORD '${PG_PASSWORD_ESCAPED}';"
 else
   warn "PostgreSQL user '${PG_USER}' already exists."
-  $SUDO -u postgres psql -c "ALTER USER \"${PG_USER}\" WITH PASSWORD '${PG_PASSWORD_ESCAPED}';"
+  "${AS_POSTGRES[@]}" psql -c "ALTER USER \"${PG_USER}\" WITH PASSWORD '${PG_PASSWORD_ESCAPED}';"
 fi
 
-if ! $SUDO -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='${PG_DB_ESCAPED}'" | grep -q 1; then
-  $SUDO -u postgres psql -c "CREATE DATABASE \"${PG_DB}\" OWNER \"${PG_USER}\";"
+if ! "${AS_POSTGRES[@]}" psql -tAc "SELECT 1 FROM pg_database WHERE datname='${PG_DB_ESCAPED}'" | grep -q 1; then
+  "${AS_POSTGRES[@]}" psql -c "CREATE DATABASE \"${PG_DB}\" OWNER \"${PG_USER}\";"
 else
   warn "PostgreSQL database '${PG_DB}' already exists."
 fi
@@ -323,15 +367,67 @@ HOOK
 chmod +x "$HOOK_FILE"
 chown "$APP_USER":"$APP_USER" "$HOOK_FILE"
 
-NGINX_SITE="/etc/nginx/sites-available/${SERVICE_NAME}"
-log "Writing nginx config: $NGINX_SITE"
-$SUDO tee "$NGINX_SITE" >/dev/null <<NGINXCONF
+read -r -p "Attach backend routes to existing nginx site with this IP if found? [Y/n]: " ATTACH_EXISTING_INPUT
+ATTACH_EXISTING_INPUT=${ATTACH_EXISTING_INPUT:-Y}
+ATTACH_EXISTING_INPUT=$(printf "%s" "$ATTACH_EXISTING_INPUT" | tr '[:upper:]' '[:lower:]')
+
+read -r -p "Preferred nginx site name to attach [toprofile_frontend]: " PREFERRED_ATTACH_SITE
+PREFERRED_ATTACH_SITE=${PREFERRED_ATTACH_SITE:-toprofile_frontend}
+
+BACKEND_SNIPPET="/etc/nginx/snippets/${SERVICE_NAME}-routes.conf"
+log "Writing backend nginx routes snippet: $BACKEND_SNIPPET"
+$SUDO tee "$BACKEND_SNIPPET" >/dev/null <<NGINXSNIPPET
+# Managed by deploy_backend_droplet.sh
+location /api/ {
+    proxy_pass http://127.0.0.1:${GUNICORN_PORT};
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+}
+NGINXSNIPPET
+
+TARGET_NGINX_SITE=""
+if [[ "$ATTACH_EXISTING_INPUT" == "y" || "$ATTACH_EXISTING_INPUT" == "yes" ]]; then
+  if [[ -e "/etc/nginx/sites-enabled/${PREFERRED_ATTACH_SITE}" ]]; then
+    TARGET_NGINX_SITE="$($SUDO readlink -f "/etc/nginx/sites-enabled/${PREFERRED_ATTACH_SITE}")"
+  else
+    for f in /etc/nginx/sites-enabled/*; do
+      [[ -f "$f" || -L "$f" ]] || continue
+      CANDIDATE="$($SUDO readlink -f "$f")"
+      if $SUDO grep -qE "server_name[[:space:]]+${SERVER_IP//./\\.}([[:space:];]|$)" "$CANDIDATE"; then
+        TARGET_NGINX_SITE="$CANDIDATE"
+        break
+      fi
+    done
+  fi
+fi
+
+INCLUDE_LINE="include ${BACKEND_SNIPPET};"
+if [[ -n "$TARGET_NGINX_SITE" && -f "$TARGET_NGINX_SITE" ]]; then
+  log "Attaching backend routes to existing nginx site: $TARGET_NGINX_SITE"
+  backup_file_if_exists "$TARGET_NGINX_SITE"
+  if ! $SUDO grep -qF "$INCLUDE_LINE" "$TARGET_NGINX_SITE"; then
+    $SUDO sed -i "/server_name[[:space:]].*${SERVER_IP//./\\.}.*/a\\    ${INCLUDE_LINE}" "$TARGET_NGINX_SITE"
+    if ! $SUDO grep -qF "$INCLUDE_LINE" "$TARGET_NGINX_SITE"; then
+      $SUDO sed -i "/server_name[[:space:]]/a\\    ${INCLUDE_LINE}" "$TARGET_NGINX_SITE"
+    fi
+  fi
+
+  # Disable dedicated backend site if it exists to avoid conflicts.
+  $SUDO rm -f "/etc/nginx/sites-enabled/${SERVICE_NAME}" || true
+else
+  NGINX_SITE="/etc/nginx/sites-available/${SERVICE_NAME}"
+  log "No existing site selected/found. Writing dedicated nginx site: $NGINX_SITE"
+  backup_file_if_exists "$NGINX_SITE"
+  $SUDO tee "$NGINX_SITE" >/dev/null <<NGINXCONF
 server {
     listen 80;
     listen [::]:80;
     server_name ${SERVER_IP};
 
     client_max_body_size 50M;
+    ${INCLUDE_LINE}
 
     location /static/ {
         alias ${APP_DIR}/staticfiles_build/static/;
@@ -339,13 +435,7 @@ server {
         add_header Cache-Control "public, max-age=2592000";
     }
 
-    location /media/ {
-        alias ${APP_DIR}/media/;
-        expires 7d;
-        add_header Cache-Control "public, max-age=604800";
-    }
-
-    location / {
+    location /api/ {
         proxy_pass http://127.0.0.1:${GUNICORN_PORT};
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -355,10 +445,18 @@ server {
 }
 NGINXCONF
 
-$SUDO ln -sf "$NGINX_SITE" "/etc/nginx/sites-enabled/${SERVICE_NAME}"
-$SUDO rm -f /etc/nginx/sites-enabled/default
+  $SUDO ln -sf "$NGINX_SITE" "/etc/nginx/sites-enabled/${SERVICE_NAME}"
+  $SUDO rm -f /etc/nginx/sites-enabled/default
+fi
 
 log "Testing and restarting nginx"
+if [[ -n "${TARGET_NGINX_SITE:-}" && -f "${TARGET_NGINX_SITE:-}" ]]; then
+  fail_fast_on_missing_includes "$TARGET_NGINX_SITE"
+fi
+if [[ -n "${NGINX_SITE:-}" && -f "${NGINX_SITE:-}" ]]; then
+  fail_fast_on_missing_includes "$NGINX_SITE"
+fi
+fail_fast_on_nginx_conflicts "$SERVER_IP"
 $SUDO nginx -t
 $SUDO systemctl enable nginx
 $SUDO systemctl restart nginx
@@ -380,8 +478,8 @@ printf -- "- DEBUG=True -> sqlite3 (local db.sqlite3)\n"
 printf -- "- DEBUG=False -> DATABASE_URL (now configured to PostgreSQL)\n"
 printf "\nExposed API routes:\n"
 printf -- "- API base: http://%s%s\n" "$SERVER_IP" "$API_BASE_PATH"
-printf -- "- Swagger UI: http://%s/\n" "$SERVER_IP"
-printf -- "- Admin: http://%s/admin/\n" "$SERVER_IP"
+printf -- "- Swagger UI: http://%s/api/swagger/\n" "$SERVER_IP"
+printf -- "- Admin: http://%s/api/admin/\n" "$SERVER_IP"
 printf "\nUseful checks:\n"
 printf -- "- systemctl status %s\n" "$SERVICE_NAME"
 printf -- "- journalctl -u %s -f\n" "$SERVICE_NAME"

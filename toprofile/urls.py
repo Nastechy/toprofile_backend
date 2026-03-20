@@ -32,13 +32,13 @@ schema_view = swagger_get_schema_view(
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('api/v1/', include("toprofile_api.urls")),
     path('api/v1/', include("account.urls")),
+    path('api/admin/', admin.site.urls),
 
-    path('swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    path('', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    path('api/swagger<format>/', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    path('api/swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
 ]
 
 if settings.DEBUG:
