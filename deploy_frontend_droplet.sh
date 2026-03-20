@@ -113,8 +113,8 @@ if [[ "${BASE_PATH}" != /* ]]; then
 fi
 BASE_PATH="${BASE_PATH%/}"
 
-read -r -p "NEXT_PUBLIC_API_BASE_URL [http://${SERVER_IP}/api/v1/]: " NEXT_PUBLIC_API_BASE_URL
-NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://${SERVER_IP}/api/v1/}
+read -r -p "NEXT_PUBLIC_API_BASE_URL [http://${SERVER_IP}/api/v1]: " NEXT_PUBLIC_API_BASE_URL
+NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://${SERVER_IP}/api/v1}
 
 read -r -p "App port [5500]: " APP_PORT
 APP_PORT=${APP_PORT:-5500}
@@ -342,10 +342,10 @@ log "Deployment complete"
 printf "\nAccess URLs:\n"
 printf -- "- Frontend root: http://%s/\n" "$SERVER_IP"
 printf -- "- Frontend base path: http://%s%s\n" "$SERVER_IP" "$BASE_PATH"
-printf -- "- Backend API (expected): http://%s/api/v1/\n" "$SERVER_IP"
+printf -- "- Backend API (expected): http://%s/api/v1\n" "$SERVER_IP"
 printf "\nUseful checks:\n"
 printf -- "- pm2 status\n"
 printf -- "- pm2 logs %s\n" "$PM2_APP_NAME"
 printf -- "- sudo nginx -t\n"
 printf -- "- curl -I http://%s/\n" "$SERVER_IP"
-printf -- "- curl -I http://%s/api/v1/\n" "$SERVER_IP"
+printf -- "- curl -I http://%s/api/v1\n" "$SERVER_IP"
