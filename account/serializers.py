@@ -33,7 +33,7 @@ class AccountCreationSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         if User.objects.filter(email=attrs['email']).exists():
-            raise RuntimeError("email : This field already exist")
+            raise serializers.ValidationError("email : This field already exist")
         else:
             return attrs
         
@@ -92,7 +92,7 @@ class ForgetPasswordInputSerializer(serializers.Serializer):
     def validate(self, attrs):
         if attrs['password']==attrs['confirm_password']:
             return attrs
-        raise RuntimeError("password doesn't match")
+        raise serializers.ValidationError("password doesn't match")
 
     def create(self, validated_data):
         try:   

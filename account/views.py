@@ -8,14 +8,15 @@ from rest_framework import status
 # from .mixin import EmailVerificationMixin
 # from .services import jwt_token
 from rest_framework.decorators import api_view,permission_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework_simplejwt.views import (TokenRefreshView,TokenBlacklistView,TokenObtainPairView)
 import datetime
 from .helpers import send_emails,jwt_token
 
 class AdminSignUpAPiView(APIView):
-    authentication_classes=[]
-    permission_classes=[]
+    authentication_classes = []
+    permission_classes = [AllowAny]
     """
     Client signup account creation
 
@@ -39,13 +40,17 @@ class LoginApiView(TokenObtainPairView):
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             data=serializer.validated_data
+        except AuthenticationFailed as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_401_UNAUTHORIZED)
+        except ValidationError as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return FailureResponse(error_handler(e),status=status.HTTP_404_NOT_FOUND)
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
         return SuccessResponse(data, status=status.HTTP_200_OK)
 
 class EmailOTpVerificationApiView(APIView):
-    permission_classes=[]
-    authentication_classes=[]
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
     @swagger_auto_schema(
         request_body=EmailVerificationSerailaizer()
@@ -77,8 +82,8 @@ class EmailOTpVerificationApiView(APIView):
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
 
 class UserEmailVerification(APIView):
-    permission_classes=[]
-    authentication_classes=[]
+    permission_classes = [AllowAny]
+    authentication_classes = []
     @swagger_auto_schema(
             request_body=UserEmailVerificationSerailaizer
     )
@@ -90,11 +95,11 @@ class UserEmailVerification(APIView):
             send_emails(email=email)
             return SuccessResponse("otp sent",status=status.HTTP_200_OK)
         except Exception as e:
-            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+            return FailureResponse(error_handler(e), status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 class ResetPasswordApiView(APIView):
-    permission_classes=[]
-    authentication_classes=[]
+    permission_classes = [AllowAny]
+    authentication_classes = []
 
     @swagger_auto_schema(
             request_body=ForgetPasswordInputSerializer
@@ -131,6 +136,8 @@ class RefreshTokenView(TokenRefreshView):
         return SuccessResponse(res.data,status=status.HTTP_200_OK)
     
 class UserProfile(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self,request):
         try:
            data=UserSerializer(request.user).data
