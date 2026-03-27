@@ -33,7 +33,11 @@ SingleTermsofserviceAPiView,
     DashBoardApiView,
     AnalyticsAPiView,
     PropertyCategoryApiView,
-    SinglePropertyCategoryApiView
+    SinglePropertyCategoryApiView,
+    MissionApiView,
+    SingleMissionApiView,
+    VisionApiView,
+    SingleVisionApiView
 )
 def api_root(_request):
     return JsonResponse(
@@ -42,6 +46,8 @@ def api_root(_request):
             "routes": {
                 "home": "/api/v1/home/",
                 "auth_login": "/api/v1/auth/login/",
+                "mission": "/api/v1/mission/",
+                "vision": "/api/v1/vision/",
                 "swagger": "/api/swagger/",
                 "admin": "/api/admin/",
             },
@@ -68,6 +74,10 @@ urlpatterns = [
     path("our_service/<int:pk>/",SingleOurServicesAPiView.as_view()),
     path("privatePolicy/",PrivatePolicyApiView.as_view()),
     path("privatePolicy/<int:pk>/",SinglePrivacyAPiView.as_view()),
+    path("mission/",MissionApiView.as_view()),
+    path("mission/<int:pk>/",SingleMissionApiView.as_view()),
+    path("vision/",VisionApiView.as_view()),
+    path("vision/<int:pk>/",SingleVisionApiView.as_view()),
     path("term/of/service/",TermsOfServiceApiView.as_view()),
     path("term/of/service/<int:pk>/",SingleTermsofserviceAPiView.as_view()),
     path("our_team/",OurTeamApiView.as_view()),

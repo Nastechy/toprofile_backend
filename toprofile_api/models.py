@@ -184,6 +184,12 @@ class PrivatePolicy(models.Model):
 class TermsOfService(models.Model):
     content=models.TextField()
 
+class Mission(models.Model):
+    content=models.TextField()
+
+class Vision(models.Model):
+    content=models.TextField()
+
 
 class AdminAppearance(models.Model):
     def upload_to(instance, filename):

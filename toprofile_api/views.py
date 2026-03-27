@@ -521,6 +521,114 @@ class SinglePrivacyAPiView(APIView):
             return SuccessResponse(ReUsableSerializer(instance).data,status=status.HTTP_200_OK)
         except Exception as e:
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+
+class MissionApiView(APIView):
+
+    @swagger_auto_schema(
+            request_body=ReUsableSerializer
+    )
+    def post(self,request):
+        try:
+            serializer=ReUsableSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            Mission.objects.create(**serializer.validated_data)
+            return SuccessResponse(serializer.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self,request):
+        try:
+            queryset=Mission.objects.all()
+            return SuccessResponse(ReUsableSerializer(queryset,many=True).data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+
+class SingleMissionApiView(APIView):
+
+    def get(self,request,pk):
+        try:
+            instance=Mission.objects.get(pk=pk)
+            return SuccessResponse(ReUsableSerializer(instance).data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+            request_body=ReUsableSerializer
+    )
+    def put(self,request,pk):
+        try:
+            serializer=ReUsableSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            Mission.objects.filter(pk=pk).update(
+                **serializer.validated_data
+            )
+            return SuccessResponse("updated successfully",status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self,request,pk):
+        try:
+            instance=Mission.objects.get(pk=pk)
+            instance.delete()
+            return SuccessResponse("Mission deleted",status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+
+class VisionApiView(APIView):
+
+    @swagger_auto_schema(
+            request_body=ReUsableSerializer
+    )
+    def post(self,request):
+        try:
+            serializer=ReUsableSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            Vision.objects.create(**serializer.validated_data)
+            return SuccessResponse(serializer.data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    def get(self,request):
+        try:
+            queryset=Vision.objects.all()
+            return SuccessResponse(ReUsableSerializer(queryset,many=True).data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+
+class SingleVisionApiView(APIView):
+
+    def get(self,request,pk):
+        try:
+            instance=Vision.objects.get(pk=pk)
+            return SuccessResponse(ReUsableSerializer(instance).data,status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+            request_body=ReUsableSerializer
+    )
+    def put(self,request,pk):
+        try:
+            serializer=ReUsableSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            Vision.objects.filter(pk=pk).update(
+                **serializer.validated_data
+            )
+            return SuccessResponse("updated successfully",status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self,request,pk):
+        try:
+            instance=Vision.objects.get(pk=pk)
+            instance.delete()
+            return SuccessResponse("Vision deleted",status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
     
     @swagger_auto_schema(
             request_body=ReUsableSerializer
@@ -917,6 +1025,8 @@ class HomeSectionApiView(APIView):
             agent=Agent.objects.all()[:10]
             team=TermsOfService.objects.all()[:10]
             policy=PrivatePolicy.objects.all()[:10]
+            mission=Mission.objects.all()[:10]
+            vision=Vision.objects.all()[:10]
 
             data={
                 "hero_section":HeroSectionSerializer(hero,many=True).data,
@@ -925,7 +1035,9 @@ class HomeSectionApiView(APIView):
                 "feature":FeatureSectionSerializer(featured,many=True).data,
                 "agent":AgentReadSerializer(agent,many=True).data,
                 "term_of_service":ReUsableSerializer(team,many=True).data,
-                "policy":ReUsableSerializer(policy,many=True).data
+                "policy":ReUsableSerializer(policy,many=True).data,
+                "mission":ReUsableSerializer(mission,many=True).data,
+                "vision":ReUsableSerializer(vision,many=True).data
             }
             return SuccessResponse(data,status=status.HTTP_200_OK)
         except Exception as e:
@@ -987,12 +1099,16 @@ class HomeApiView(APIView):
             testimony=Testimony.objects.all()[:10]
             about_us=AboutUs.objects.all()[:10]
             our_agent=Agent.objects.all()[:10]
+            mission=Mission.objects.all()[:10]
+            vision=Vision.objects.all()[:10]
             res={
                 "feature_property":PropertyOutputSerializer(feature_property,many=True).data,
                 "our_service":OurServiceSerializer(our_service,many=True).data,
                 "testimony":TestimonySerializer(testimony,many=True).data,
                 "about_us":AboutUseSerializer(about_us,many=True).data,
-                "agent":AgentReadSerializer(our_agent,many=True).data
+                "agent":AgentReadSerializer(our_agent,many=True).data,
+                "mission":ReUsableSerializer(mission,many=True).data,
+                "vision":ReUsableSerializer(vision,many=True).data
             }
             return SuccessResponse(res,status=status.HTTP_200_OK)
         except Exception as e:
