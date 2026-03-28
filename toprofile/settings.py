@@ -247,13 +247,34 @@ SWAGGER_SETTINGS = {
    },
 }
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.smtp.EmailBackend",
+)
 
-EMAIL_HOST ='smtp.gmail.com'
-EMAIL_HOST_USER =config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD =config('EMAIL_HOST_PASSWORD')
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+# Brevo SMTP defaults; all values can be overridden from .env.
+EMAIL_HOST = config("EMAIL_HOST", default="smtp-relay.brevo.com")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=30, cast=int)
+
+# Support either Django-standard keys or Brevo-specific aliases.
+EMAIL_HOST_USER = config(
+    "EMAIL_HOST_USER",
+    default=config("BREVO_SMTP_LOGIN", default=""),
+)
+EMAIL_HOST_PASSWORD = config(
+    "EMAIL_HOST_PASSWORD",
+    default=config("BREVO_SMTP_KEY", default=""),
+)
+
+DEFAULT_FROM_EMAIL = config(
+    "DEFAULT_FROM_EMAIL",
+    default=(EMAIL_HOST_USER or "no-reply@toprofile.com"),
+)
+SERVER_EMAIL = config("SERVER_EMAIL", default=DEFAULT_FROM_EMAIL)
+EMAIL_SUBJECT_PREFIX = config("EMAIL_SUBJECT_PREFIX", default="[Toprofile] ")
 
 # if not DEBUG:
 #     MEDIA_ROOT="/home/jaswbwsw/media.jaswillproperties.cloud/"

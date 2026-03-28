@@ -16,7 +16,7 @@ def send_emails(email,instance=None):
             "otp":otp,
             "username":instance.username if instance else "user"
         })
-            from_email = settings.EMAIL_HOST_USER
+            from_email = settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER
             to_email = email
             text_content = strip_tags(message)
             msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
