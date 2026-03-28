@@ -7,10 +7,16 @@ from .views import (
                     LogoutView,
                     RefreshTokenView,
                     UserProfile,
-                    UserEmailVerification
+                    UserEmailVerification,
+                    UserListApiView,
+                    SingleUserApiView
                     )
 urlpatterns = [
 url('auth/sign-up/',AdminSignUpAPiView.as_view()),
+url('auth/users/',UserListApiView.as_view()),
+url('auth/users/<uuid:id>/',SingleUserApiView.as_view()),
+url('users/',UserListApiView.as_view()),
+url('users/<uuid:id>/',SingleUserApiView.as_view()),
 url('auth/login/',LoginApiView.as_view()),
 url('auth/email/otp/verification/',EmailOTpVerificationApiView.as_view()),
 url('auth/email/verification/',UserEmailVerification.as_view()),

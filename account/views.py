@@ -13,6 +13,9 @@ from rest_framework.exceptions import AuthenticationFailed, ValidationError
 from rest_framework_simplejwt.views import (TokenRefreshView,TokenBlacklistView,TokenObtainPairView)
 import datetime
 from .helpers import send_emails,jwt_token
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class AdminSignUpAPiView(APIView):
     authentication_classes = []
@@ -147,7 +150,7 @@ class UserProfile(APIView):
            return SuccessResponse(data,status=status.HTTP_200_OK)
         except Exception as e:
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
-            
+
     @swagger_auto_schema(
             request_body=UserSerializer
     )
@@ -159,7 +162,61 @@ class UserProfile(APIView):
            return SuccessResponse(serializer.data,status=status.HTTP_200_OK)
         except Exception as e:
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
-            
 
 
-        
+class UserListApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            users = User.objects.order_by("-date_joined")
+            serializer = UserManagementSerializer(users, many=True)
+            return SuccessResponse(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
+
+
+class SingleUserApiView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self, id):
+        return User.objects.filter(id=id).first()
+
+    def get(self, request, id):
+        try:
+            instance = self.get_object(id)
+            if not instance:
+                return FailureResponse("User not found", status=status.HTTP_404_NOT_FOUND)
+            serializer = UserManagementSerializer(instance)
+            return SuccessResponse(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
+
+    @swagger_auto_schema(
+            request_body=UserManagementSerializer
+    )
+    def put(self, request, id):
+        try:
+            instance = self.get_object(id)
+            if not instance:
+                return FailureResponse("User not found", status=status.HTTP_404_NOT_FOUND)
+            serializer = UserManagementSerializer(instance, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return SuccessResponse(serializer.data, status=status.HTTP_200_OK)
+        except ValidationError as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, id):
+        try:
+            instance = self.get_object(id)
+            if not instance:
+                return FailureResponse("User not found", status=status.HTTP_404_NOT_FOUND)
+            if str(request.user.id) == str(instance.id):
+                return FailureResponse("You cannot delete your own account", status=status.HTTP_400_BAD_REQUEST)
+            instance.delete()
+            return SuccessResponse("user deleted successfully", status=status.HTTP_200_OK)
+        except Exception as e:
+            return FailureResponse(error_handler(e), status=status.HTTP_400_BAD_REQUEST)

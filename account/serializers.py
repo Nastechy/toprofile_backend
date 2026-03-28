@@ -128,3 +128,29 @@ class UserSerializer(serializers.ModelSerializer):
                 "read_only":True
             }
         }
+
+
+class UserManagementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = get_user_model()
+        fields = [
+            "id",
+            "username",
+            "phone_number",
+            "email",
+            "is_active",
+            "date_joined",
+        ]
+        read_only_fields = ["id", "date_joined"]
+
+    def validate_email(self, value):
+        email = (value or "").strip()
+        if not email:
+            raise serializers.ValidationError("This field is required.")
+
+        queryset = User.objects.filter(email__iexact=email)
+        if self.instance:
+            queryset = queryset.exclude(pk=self.instance.pk)
+        if queryset.exists():
+            raise serializers.ValidationError("This field already exists")
+        return email
