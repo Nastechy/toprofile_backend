@@ -44,7 +44,7 @@ class PropertyListing(models.Model):
     slug=models.SlugField(unique=True,blank=True,max_length=500)
     title=models.TextField()
     address=models.CharField(max_length=500,null=True)
-    land_space=models.IntegerField(default=0)
+    land_space=models.CharField(max_length=255,default="")
     category=models.ForeignKey(PropertyCategory,on_delete=models.CASCADE,related_name="listings",null=True)
     amount=models.DecimalField(max_digits=10,decimal_places=0)
     created_at=models.DateTimeField(auto_now_add=True)

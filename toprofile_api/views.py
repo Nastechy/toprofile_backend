@@ -305,21 +305,63 @@ class SinglePropertyApiView(APIView):
             request_body=PropertyInputSerializer
     )
     def put(self,request,slug):
+        uploaded_public_ids = []
         try:
             with transaction.atomic():
-                instance=PropertyListing.objects.get(slug=slug)
-                serializer=PropertyInputSerializer(instance=instance,data=request.data)
+                instance = PropertyListing.objects.get(slug=slug)
+                serializer = PropertyInputSerializer(instance=instance, data=request.data, partial=True)
                 serializer.is_valid(raise_exception=True)
-                images=serializer.validated_data.pop("propertyImages",None)
-                data=serializer.save()
-                #save image 
+
+                images = serializer.validated_data.pop("propertyImages", None)
+                property_obj = serializer.save()
+
+                # Only replace gallery when new image files are supplied.
                 if images:
-                    #delete the image associated to that instance
+                    existing_assets = list(ImageAsset.objects.filter(property=instance))
+                    uploaded_assets = []
+
+                    for idx, file_obj in enumerate(images):
+                        logger.debug(
+                            "PUT /property/%s upload idx=%s name=%s size=%s",
+                            slug,
+                            idx,
+                            getattr(file_obj, "name", None),
+                            getattr(file_obj, "size", None),
+                        )
+
+                        upload = upload_property_image(file_obj, folder=f"properties/{property_obj.id}")
+                        uploaded_public_ids.append(upload["public_id"])
+                        uploaded_assets.append(upload)
+
+                    # Remote cleanup of old cloudinary assets (best effort), then DB cleanup.
+                    for asset in existing_assets:
+                        if getattr(asset, "public_id", None):
+                            try:
+                                delete_image(asset.public_id)
+                            except Exception:
+                                logger.exception("Failed deleting old cloudinary image %s", asset.public_id)
                     ImageAsset.objects.filter(property=instance).delete()
-                    for image in images:
-                    #save new image
-                        ImageAsset.objects.create(property=data,image=image["image"])
-                return SuccessResponse(serializer.data,status=status.HTTP_200_OK)
+
+                    for upload in uploaded_assets:
+                        ImageAsset.objects.create(
+                            property=property_obj,
+                            url=upload["url"],
+                            public_id=upload["public_id"],
+                            width=upload.get("width"),
+                            height=upload.get("height"),
+                            format=upload.get("format"),
+                        )
+
+                data = PropertyOutputSerializer(property_obj).data
+                return SuccessResponse(data,status=status.HTTP_200_OK)
+        except CloudinaryUploadError as e:
+            logger.exception("CloudinaryUploadError during property update slug=%s", slug)
+            for pid in uploaded_public_ids:
+                try:
+                    delete_image(pid)
+                except Exception:
+                    logger.exception("Rollback delete_image failed for %s", pid)
+            return FailureResponse({"detail": f"Cloudinary upload failed: {e}"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
         
