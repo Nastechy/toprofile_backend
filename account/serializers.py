@@ -13,11 +13,17 @@ from rest_framework.views import APIView
 User=get_user_model()
 
 class AccountCreationSerializer(serializers.ModelSerializer):
+    # Backward compatibility for older clients still posting `phonenumber`.
+    phonenumber = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, write_only=True
+    )
+
     class Meta:
         model=get_user_model()
         fields=[
             "username",
             "phone_number",
+            "phonenumber",
             "email",
             "password",
             "address",
@@ -32,15 +38,19 @@ class AccountCreationSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
-        if User.objects.filter(email=attrs['email']).exists():
-            raise serializers.ValidationError("email : This field already exist")
-        else:
-            return attrs
+        legacy_phone_number = attrs.pop("phonenumber", None)
+        if legacy_phone_number and not attrs.get("phone_number"):
+            attrs["phone_number"] = legacy_phone_number
+
+        email = attrs.get("email")
+        if email and User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({"email": "This field already exists"})
+
+        return attrs
         
     def create(self, validated_data):
-        user=User.objects.create(**validated_data)
-        user.set_password(validated_data['password'])
-        user.save()
+        password = validated_data.pop("password")
+        user = User.objects.create_user(password=password, **validated_data)
         return user
     
 class TokenObtainPairSerializer(TokenObtainSerializer):

@@ -26,12 +26,15 @@ class AdminSignUpAPiView(APIView):
     )
     def post(self,request):
         try:
-            serializer=AccountCreationSerializer(data=request.data)
+            serializer = AccountCreationSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            serializer.save()
-        except Exception as e:
+            user = serializer.save()
+            response_data = AccountCreationSerializer(user).data
+        except ValidationError as e:
           return FailureResponse(error_handler(e),status=status.HTTP_400_BAD_REQUEST)
-        return SuccessResponse(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+          return FailureResponse(str(e),status=status.HTTP_400_BAD_REQUEST)
+        return SuccessResponse(response_data, status=status.HTTP_201_CREATED)
     
 class LoginApiView(TokenObtainPairView):
 

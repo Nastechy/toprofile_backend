@@ -18,7 +18,6 @@ from .helpers import send_emails
 @receiver(post_save, sender=settings.AUTH_USER_MODEL, dispatch_uid="unique_identifier")
 def send_otp_to_email(sender, instance, created, **kwargs):
     if created:
-        try:
-            send_emails(instance.email,instance)
-        except Exception as e:
-            print(f'Error sending confirmation email: {e}')
+        email_sent = send_emails(instance.email, instance)
+        if not email_sent:
+            print(f"Error sending confirmation email for user: {instance.email}")

@@ -19,17 +19,17 @@ def send_emails(email,instance=None):
             from_email = settings.EMAIL_HOST_USER
             to_email = email
             text_content = strip_tags(message)
-            # send_mail(subject, message, from_email, [to_email], fail_silently=False)
             msg = EmailMultiAlternatives(subject, text_content, from_email, [to_email])
             msg.attach_alternative(message, "text/html")
             msg.send()
 
-            #save the email and the otp to email verification table
+            # Save the email and OTP to verification table.
             EmailVerification.objects.filter(email=email).delete()
             EmailVerification.objects.create(email=email,otp=otp)
-        except Exception as e:
-             raise RuntimeError("Error in sending email")
-             return None
+            return True
+        except Exception:
+             # Do not raise from helper to avoid turning signup into 500.
+             return False
 
 
 def jwt_token(user):
